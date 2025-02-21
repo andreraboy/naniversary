@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Animated Flower Drawing</title>
+    <!-- Using a script font from Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap" rel="stylesheet" />
+    <style>
+        body {
+            margin: 0;
+            background-color: #222;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            background-color: #222;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="drawingCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let progress = 0;
+        const totalSteps = 500; // Total animation steps
+        const stemSteps = 100;  // Steps dedicated to drawing the stem
+        const petalCount = 12;  // Number of petals per flower
+        let flowers = [];
+
+        // Global variable for the animated gift message.
+        let giftMessage = null;
+        function triggerGiftMessage() {
+            // Include a line break via "\n"
+            giftMessage = { 
+                text: "send address\nso i can deliver your gift", 
+                time: 0, 
+                duration: 360 // frames, slower fade
+            };
+        }
+
+        // Falling petals particles
+        const fallingPetals = [];
+        const numFalling = 20;
+        for (let i = 0; i < numFalling; i++) {
+            fallingPetals.push({
+                x: Math.random(),
+                y: Math.random(),
+                speedY: 1 + Math.random() * 1.5,
+                drift: (Math.random() - 0.5) * 1.5,
+                scale: 0.3 + Math.random() * 0.3,
+                angle: Math.random() * 2 * Math.PI
+            });
+        }
+
+        // Resize and recalc flower positions based on window size.
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // Recalculate flower positions – distribute four flowers horizontally.
+            flowers = [];
+            const xPositions = [
+                canvas.width * 0.2,
+                canvas.width * 0.4,
+                canvas.width * 0.6,
+                canvas.width * 0.8
+            ];
+            xPositions.forEach(x => {
+                // Random y between 30% and 50% of canvas height.
+                const cy = canvas.height * 0.3 + Math.random() * (canvas.height * 0.2);
+                flowers.push({ cx: x, cy });
+            });
+            // Reset falling petals positions.
+            fallingPetals.forEach(p => {
+                p.x = Math.random() * canvas.width;
+                p.y = Math.random() * -canvas.height;
+            });
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Draw the stem for a flower at (cx, cy).
+        function drawStem(cx, cy, curStep) {
+            const stemStartX = cx;
+            const stemStartY = canvas.height;
+            const stemEndY = cy;
+            const t = Math.min(curStep / stemSteps, 1);
+            const currentY = stemStartY - t * (stemStartY - stemEndY);
+            
+            ctx.save();
+            const grad = ctx.createLinearGradient(stemStartX, stemStartY, stemStartX, stemEndY);
+            grad.addColorStop(0, "#2E8B57");
+            grad.addColorStop(1, "#228B22");
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 8;
+            ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            ctx.beginPath();
+            ctx.moveTo(stemStartX, stemStartY);
+            ctx.lineTo(stemStartX, currentY);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Draw petals for a flower at (cx, cy).
+        function drawPetals(cx, cy, bloomFactor) {
+            const petalRadius = 60;
+            const petalWidth = 40;
+            const petalHeight = 20;
+            
+            for (let i = 0; i < petalCount; i++) {
+                const angle = (i * 2 * Math.PI) / petalCount;
+                const petalCenterX = cx + petalRadius * bloomFactor * Math.cos(angle);
+                const petalCenterY = cy + petalRadius * bloomFactor * Math.sin(angle);
+                
+                ctx.save();
+                const grad = ctx.createRadialGradient(petalCenterX, petalCenterY, 5, petalCenterX, petalCenterY, petalWidth * bloomFactor);
+                grad.addColorStop(0, "#FFC0CB");
+                grad.addColorStop(1, "#FF69B4");
+                ctx.fillStyle = grad;
+                ctx.strokeStyle = "#FF69B4";
+                ctx.lineWidth = 2;
+                ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
+                ctx.shadowBlur = 3;
+                ctx.shadowOffsetX = 2;
+                ctx.shadowOffsetY = 2;
+                ctx.beginPath();
+                ctx.ellipse(petalCenterX, petalCenterY, petalWidth * bloomFactor, petalHeight * bloomFactor, angle, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // Draw the flower center for a flower at (cx, cy).
+        function drawCentre(cx, cy, bloomFactor) {
+            ctx.save();
+            const radius = 20 * bloomFactor;
+            const grad = ctx.createRadialGradient(cx, cy, 5, cx, cy, radius);
+            grad.addColorStop(0, "#FFFACD");
+            grad.addColorStop(1, "#FFD700");
+            ctx.fillStyle = grad;
+            ctx.strokeStyle = "#DAA520";
+            ctx.lineWidth = 2;
+            ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Draw the text at the top.
+        function drawText(bloomFactor) {
+            ctx.save();
+            const fontSize = Math.round(canvas.width * 0.06);
+            ctx.font = fontSize + "px 'Great Vibes', cursive";
+            ctx.textAlign = "center";
+            ctx.fillStyle = "white";
+            ctx.globalAlpha = bloomFactor;
+            ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            // Use dynamic top margin (here, fontSize * 2)
+            ctx.fillText("Happy 3rd year Naniversary!!", canvas.width / 2, fontSize * 2);
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+
+        // Update and draw falling petal particles.
+        function updateAndDrawFallingPetals() {
+            ctx.save();
+            for (let i = 0; i < fallingPetals.length; i++) {
+                const p = fallingPetals[i];
+                p.y += p.speedY;
+                p.x += p.drift;
+                p.angle += 0.01;
+                if (p.y > canvas.height + 20) {
+                    p.y = -20;
+                    p.x = Math.random() * canvas.width;
+                }
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.angle);
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 20 * p.scale, 10 * p.scale, 0, 0, 2 * Math.PI);
+                ctx.fillStyle = "pink";
+                ctx.fill();
+                ctx.strokeStyle = "#FF69B4";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        // Draw the complete scene.
+        function drawScene(progress) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw each flower.
+            flowers.forEach(flower => {
+                if (progress <= stemSteps) {
+                    drawStem(flower.cx, flower.cy, progress);
+                } else {
+                    drawStem(flower.cx, flower.cy, stemSteps);
+                    const bloomFactor = Math.min((progress - stemSteps) / (totalSteps - stemSteps), 1);
+                    drawPetals(flower.cx, flower.cy, bloomFactor);
+                    drawCentre(flower.cx, flower.cy, bloomFactor);
+                }
+            });
+
+            // Draw text when flowers bloom.
+            if (progress > stemSteps) {
+                const bloomFactor = Math.min((progress - stemSteps) / (totalSteps - stemSteps), 1);
+                drawText(bloomFactor);
+            }
+
+            // Draw falling petals on top.
+            updateAndDrawFallingPetals();
+
+            // If a gift message is active, draw it.
+            if (giftMessage) {
+                drawGiftMessage();
+            }
+        }
+
+        // Draw the animated gift message with line breaks.
+        function drawGiftMessage() {
+            ctx.save();
+            const alpha = 1 - giftMessage.time / giftMessage.duration;
+            ctx.globalAlpha = alpha;
+            // Use a larger font for the gift message: 10% of canvas width.
+            const fontSize = Math.round(canvas.width * 0.1);
+            ctx.font = fontSize + "px 'Great Vibes', cursive";
+            ctx.textAlign = "center";
+            ctx.fillStyle = "white";
+            
+            // Split the text on newline and calculate lineHeight.
+            const lines = giftMessage.text.split('\n');
+            const lineHeight = fontSize * 1.2;
+            const totalHeight = lines.length * lineHeight;
+            // Center the block of text vertically.
+            const startY = canvas.height / 2 - totalHeight / 2 + fontSize;
+            lines.forEach((line, i) => {
+                ctx.fillText(line, canvas.width / 2, startY + i * lineHeight);
+            });
+            
+            ctx.globalAlpha = 1;
+            ctx.restore();
+        }
+
+        // Main animation loop.
+        function animate() {
+            if (progress <= totalSteps) {
+                progress++;
+            }
+            if (giftMessage) {
+                giftMessage.time++;
+                if (giftMessage.time > giftMessage.duration) {
+                    giftMessage = null;
+                }
+            }
+            drawScene(progress);
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // Add click event listener to canvas.
+        canvas.addEventListener('click', function(event) {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const clickY = event.clientY - rect.top;
+            for (const flower of flowers) {
+                const radius = 20; // fully bloomed center radius.
+                const dx = clickX - flower.cx;
+                const dy = clickY - flower.cy;
+                if (Math.sqrt(dx * dx + dy * dy) <= radius + 5) {
+                    triggerGiftMessage();
+                    break;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
