@@ -29,6 +29,7 @@
         const stemSteps = 100;  // Steps dedicated to drawing the stem
         const petalCount = 12;  // Number of petals per flower
         let flowers = [];
+        const minDistance = 100; // minimum distance between flower centers
 
         // Global variable for the animated gift message.
         let giftMessage = null;
@@ -55,11 +56,23 @@
             });
         }
 
+        // Check that candidate flower does not overlap existing ones.
+        function isNonOverlapping(candidate, flowersArray) {
+            for (let f of flowersArray) {
+                const dx = candidate.cx - f.cx;
+                const dy = candidate.cy - f.cy;
+                if ( Math.sqrt(dx * dx + dy * dy) < minDistance ) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         // Resize and recalc flower positions based on window size.
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            // Recalculate flower positions – distribute four flowers horizontally.
+            // Recalculate flower positions – use fixed x positions.
             flowers = [];
             const xPositions = [
                 canvas.width * 0.2,
@@ -67,10 +80,22 @@
                 canvas.width * 0.6,
                 canvas.width * 0.8
             ];
+            // For each x, generate a y between 30% and 50% of canvas height
+            // and ensure that the new candidate does not overlap previously
+            // placed flowers.
             xPositions.forEach(x => {
-                // Random y between 30% and 50% of canvas height.
-                const cy = canvas.height * 0.3 + Math.random() * (canvas.height * 0.2);
-                flowers.push({ cx: x, cy });
+                let candidate;
+                let attempts = 0;
+                do {
+                    candidate = { 
+                        cx: x, 
+                        cy: canvas.height * 0.3 + Math.random() * (canvas.height * 0.2)
+                    };
+                    attempts++;
+                    // Break after 10 attempts and accept candidate.
+                    if (attempts > 10) break;
+                } while (!isNonOverlapping(candidate, flowers));
+                flowers.push(candidate);
             });
             // Reset falling petals positions.
             fallingPetals.forEach(p => {
@@ -81,19 +106,15 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Draw the stem for a flower at (cx, cy).
+        // Draw the stem for a flower at (cx, cy) with a solid color.
         function drawStem(cx, cy, curStep) {
             const stemStartX = cx;
             const stemStartY = canvas.height;
             const stemEndY = cy;
             const t = Math.min(curStep / stemSteps, 1);
             const currentY = stemStartY - t * (stemStartY - stemEndY);
-            
             ctx.save();
-            const grad = ctx.createLinearGradient(stemStartX, stemStartY, stemStartX, stemEndY);
-            grad.addColorStop(0, "#2E8B57");
-            grad.addColorStop(1, "#228B22");
-            ctx.strokeStyle = grad;
+            ctx.strokeStyle = "#228B22"; // solid green
             ctx.lineWidth = 8;
             ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
             ctx.shadowBlur = 4;
@@ -106,23 +127,18 @@
             ctx.restore();
         }
 
-        // Draw petals for a flower at (cx, cy).
+        // Draw petals for a flower at (cx, cy) with a solid color.
         function drawPetals(cx, cy, bloomFactor) {
             const petalRadius = 60;
             const petalWidth = 40;
             const petalHeight = 20;
-            
             for (let i = 0; i < petalCount; i++) {
                 const angle = (i * 2 * Math.PI) / petalCount;
                 const petalCenterX = cx + petalRadius * bloomFactor * Math.cos(angle);
                 const petalCenterY = cy + petalRadius * bloomFactor * Math.sin(angle);
-                
                 ctx.save();
-                const grad = ctx.createRadialGradient(petalCenterX, petalCenterY, 5, petalCenterX, petalCenterY, petalWidth * bloomFactor);
-                grad.addColorStop(0, "#FFC0CB");
-                grad.addColorStop(1, "#FF69B4");
-                ctx.fillStyle = grad;
-                ctx.strokeStyle = "#FF69B4";
+                ctx.fillStyle = "#FFC0CB";  // solid pink
+                ctx.strokeStyle = "#FF69B4"; // solid hot pink
                 ctx.lineWidth = 2;
                 ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
                 ctx.shadowBlur = 3;
@@ -136,15 +152,12 @@
             }
         }
 
-        // Draw the flower center for a flower at (cx, cy).
+        // Draw the flower center for a flower at (cx, cy) with a solid color.
         function drawCentre(cx, cy, bloomFactor) {
             ctx.save();
             const radius = 20 * bloomFactor;
-            const grad = ctx.createRadialGradient(cx, cy, 5, cx, cy, radius);
-            grad.addColorStop(0, "#FFFACD");
-            grad.addColorStop(1, "#FFD700");
-            ctx.fillStyle = grad;
-            ctx.strokeStyle = "#DAA520";
+            ctx.fillStyle = "#FFD700"; // solid gold
+            ctx.strokeStyle = "#DAA520"; // goldenrod
             ctx.lineWidth = 2;
             ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
             ctx.shadowBlur = 4;
@@ -169,7 +182,6 @@
             ctx.shadowBlur = 4;
             ctx.shadowOffsetX = 2;
             ctx.shadowOffsetY = 2;
-            // Use dynamic top margin (here, fontSize * 2)
             ctx.fillText("Happy 3rd year Naniversary!!", canvas.width / 2, fontSize * 2);
             ctx.globalAlpha = 1;
             ctx.restore();
@@ -205,8 +217,6 @@
         // Draw the complete scene.
         function drawScene(progress) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw each flower.
             flowers.forEach(flower => {
                 if (progress <= stemSteps) {
                     drawStem(flower.cx, flower.cy, progress);
@@ -217,17 +227,11 @@
                     drawCentre(flower.cx, flower.cy, bloomFactor);
                 }
             });
-
-            // Draw text when flowers bloom.
             if (progress > stemSteps) {
                 const bloomFactor = Math.min((progress - stemSteps) / (totalSteps - stemSteps), 1);
                 drawText(bloomFactor);
             }
-
-            // Draw falling petals on top.
             updateAndDrawFallingPetals();
-
-            // If a gift message is active, draw it.
             if (giftMessage) {
                 drawGiftMessage();
             }
@@ -238,22 +242,17 @@
             ctx.save();
             const alpha = 1 - giftMessage.time / giftMessage.duration;
             ctx.globalAlpha = alpha;
-            // Use a larger font for the gift message: 10% of canvas width.
             const fontSize = Math.round(canvas.width * 0.1);
             ctx.font = fontSize + "px 'Great Vibes', cursive";
             ctx.textAlign = "center";
             ctx.fillStyle = "white";
-            
-            // Split the text on newline and calculate lineHeight.
             const lines = giftMessage.text.split('\n');
             const lineHeight = fontSize * 1.2;
             const totalHeight = lines.length * lineHeight;
-            // Center the block of text vertically.
             const startY = canvas.height / 2 - totalHeight / 2 + fontSize;
             lines.forEach((line, i) => {
                 ctx.fillText(line, canvas.width / 2, startY + i * lineHeight);
             });
-            
             ctx.globalAlpha = 1;
             ctx.restore();
         }
@@ -272,7 +271,6 @@
             drawScene(progress);
             requestAnimationFrame(animate);
         }
-
         animate();
 
         // Add click event listener to canvas.
@@ -281,7 +279,7 @@
             const clickX = event.clientX - rect.left;
             const clickY = event.clientY - rect.top;
             for (const flower of flowers) {
-                const radius = 20; // fully bloomed center radius.
+                const radius = 20;
                 const dx = clickX - flower.cx;
                 const dy = clickY - flower.cy;
                 if (Math.sqrt(dx * dx + dy * dy) <= radius + 5) {
